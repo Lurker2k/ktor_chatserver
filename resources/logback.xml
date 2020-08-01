@@ -1,12 +1,34 @@
+
 <configuration>
+    <appender name="INFOFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>serverlogs/InfoLevel-%d{yyyy-MM, aux}/Infolog-%d{yyyy-MM-dd}.log</fileNamePattern>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%date;[%file:%line];%msg%n</pattern>
+        </encoder>
+    </appender>
+    <appender name="WARNINGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>serverlogs/WarningLevel-%d{yyyy-MM, aux}/Infolog-%d{yyyy-MM-dd}.log</fileNamePattern>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%date;[%file:%line];%msg%n</pattern>
+        </encoder>
+    </appender>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <root level="trace">
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>
-    <logger name="org.eclipse.jetty" level="INFO"/>
-    <logger name="io.netty" level="INFO"/>
+    <logger name="infologger" level="INFO">
+        <appender-ref ref="INFOFILE"/>"
+    </logger>
+    <logger name="warninglogger" level="INFO">
+        <appender-ref ref="WARNINGFILE"/>"
+    </logger>
 </configuration>

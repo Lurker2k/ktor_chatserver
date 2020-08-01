@@ -1,0 +1,46 @@
+version: "3.8"
+services:
+
+#Pull a mysql image as Database for the chatserver
+  database:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+    #Add environment variables for the image
+    #you might want to use these variables: MYSQL_USER, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, MYSQL_DATABASE
+    #if you already have a database, which you want to use for the chatserver you can remove this image
+    env_file:
+      - datenbank.env
+
+    #expose the defaultport of the database, this is helpful to access the database from outside
+    ports:
+      - 3306:3306
+
+    #mount the internal folder where mysql saves the data to an external volume
+    #You should do this to prevent accidently deleting your database when you remove the container
+
+    #volumes:
+      #- /var/mysql:/var/lib/mysql
+
+
+  #pull an image of the chatserver
+  chatserver:
+    image: lurker2k/chat:latest
+    container_name: chatserver
+    restart: always
+    #depends_on:
+      #- database
+    ports:
+      - 1300:1300 #Set ports according to your env variables, 1300 is the default port
+
+    #use an env file which includes all env variables for the chatserver
+    #See the readmefile for the needed env variables or look at database.env for examples
+    env_file:
+      - datenbank.env
+
+
+
+
+
+
+
