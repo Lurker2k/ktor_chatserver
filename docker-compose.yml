@@ -10,7 +10,7 @@ services:
     #you might want to use these variables: MYSQL_USER, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, MYSQL_DATABASE
     #if you already have a database, which you want to use for the chatserver you can remove this image
     env_file:
-      - datenbank.env
+      - databaseEnvironment.env
 
     #expose the defaultport of the database, this is helpful to access the database from outside
     ports:
@@ -36,7 +36,7 @@ services:
     #use an env file which includes all env variables for the chatserver
     #See the readmefile for the needed env variables or look at database.env for examples
     env_file:
-      - datenbank.env
+      - databaseEnvironment.env
 
 
 
