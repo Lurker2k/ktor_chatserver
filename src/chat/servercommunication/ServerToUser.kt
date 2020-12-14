@@ -51,37 +51,6 @@ object ServerToUser {
     }
 
     /**
-     * Send a new generated ID for a User to the User
-     * @param socketId The ID of the User to identifiy him on return
-     * @param socket the socket with which the user is connected to the server
-     */
-    suspend fun sendSocketID(socketId: String,socket: DefaultWebSocketServerSession){
-        val json = JsonObject().apply {
-            addProperty(Types.TYPE.name, ClientStatus.SETCOOKIE.name)
-            addProperty(ClientStatus.COOKIE.name,socketId)
-        }
-         socket.send(json.toString())
-    }
-
-    /**
-     * Request an ID from the User if he already has one
-     *  @param socket Socket of the User
-     */
-    suspend fun requestSocketID(socket: DefaultWebSocketServerSession){
-        val json = JsonObject().apply {
-            addProperty(Types.TYPE.name, ClientStatus.SENDCOOKIE.name)
-        }
-         socket.send(json.toString())
-    }
-
-    suspend fun invalidCookie(socket: DefaultWebSocketServerSession){
-        val jsonObject = JsonObject().apply {
-            addProperty(Types.TYPE.name, ClientStatus.INVALIDCOOKIE.name)
-        }
-        socket.send(jsonObject.toString())
-    }
-
-    /**
      * Send the currently status of the admin to a new connected User
      * @param socket Socket of the User
      */

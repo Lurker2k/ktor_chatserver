@@ -1,16 +1,16 @@
 package chat.servercommunication
 
-import ch.qos.logback.classic.Logger
 import chat.dataclass.ChatMessage
 import chat.dataclass.ChatUser
 import chat.daos.ChatMessagesDAO
 import chat.api_enums.*
+import chat.daos.ChatUserInfoDAO
+import chat.dataclass.UserInfo
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import io.ktor.http.cio.websocket.send
-import org.slf4j.LoggerFactory
-import kotlin.math.log
+
 
 object ServerToAdmin {
 
@@ -23,7 +23,7 @@ object ServerToAdmin {
         val jsonObject = JsonObject().apply {
             addProperty(ClientStatus.SOCKETID.name,socketId)
             addProperty(Types.TYPE.name, ServerStatus.REMOVECHATUSER.name)
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
         }
 
         ServerData.adminSocket?.send(jsonObject.toString())
@@ -39,7 +39,7 @@ object ServerToAdmin {
         val jsonObject = JsonObject().apply {
             add(ServerStatus.ADDCHATUSER.name,Gson().toJsonTree(chatUser))
             addProperty(Types.TYPE.name, ServerStatus.ADDCHATUSER.name)
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
         }
         ServerData.adminSocket?.send(jsonObject.toString())
     }
@@ -51,7 +51,7 @@ object ServerToAdmin {
     suspend fun adminOnline(){
         val jsonObject = JsonObject().apply {
             addProperty(Types.TYPE.name, AdminStatus.ONLINE.name)
-            addProperty(Types.VIEW.name, AdminStatus.MAINSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.MAINSCREEN.name)
         }
         ServerData.adminSocket?.send(jsonObject.toString())
     }
@@ -63,7 +63,7 @@ object ServerToAdmin {
     suspend fun adminOffline(){
         val jsonObject = JsonObject().apply {
             addProperty(Types.TYPE.name, AdminStatus.OFFLINE.name)
-            addProperty(Types.VIEW.name, AdminStatus.MAINSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.MAINSCREEN.name)
         }
         ServerData.adminSocket?.send(jsonObject.toString())
     }
@@ -76,7 +76,7 @@ object ServerToAdmin {
         val gson = Gson()
         val jsonObject = JsonObject().apply {
             addProperty(Types.TYPE.name, ServerStatus.CHATUSERS.name)
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
         }
 
         val jsonArray = JsonArray()
@@ -97,18 +97,40 @@ object ServerToAdmin {
      */
     suspend fun getCurrentChat(socketId: String){
         val jsonObject = JsonObject().apply {
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
             addProperty(Types.TYPE.name, Messages.CHATLOG.name)
         }
-        val jsonArray = ChatMessagesDAO.getMessages(socketId)
-        jsonObject.add(Messages.CHATLOG.name,jsonArray)
-        ServerData.adminHasSelectedID = socketId
-        LoggerFactory.getLogger("Application").let{
-            it.info("")
-        }
 
+        jsonObject.add(Messages.CHATLOG.name,ChatMessagesDAO.getMessages(socketId))
+        ServerData.adminHasSelectedID = socketId
         ServerData.adminSocket?.send(jsonObject.toString())
 
+    }
+
+    /**
+     * When a user is selected this function requests all infos, which are added to this user
+     * @param socketId the ID of the user
+     */
+    suspend fun getUserInfo(socketId: String){
+        val jsonObject = JsonObject().apply {
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
+            addProperty(Types.TYPE.name, UserInfos.GETUSERINFO.name)
+        }
+        jsonObject.add(UserInfos.GETUSERINFO.name,ChatUserInfoDAO.getInfos(socketId))
+        ServerData.adminSocket?.send(jsonObject.toString())
+    }
+
+    /**
+     * Sent the created Userinfo to the admin
+     * @param userInfo the created UserInfo
+     */
+    suspend fun userAdded(userInfo: UserInfo){
+        val jsonObject = JsonObject().apply {
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
+            addProperty(Types.TYPE.name, UserInfos.ADDUSERINFO.name)
+            add(UserInfos.ADDUSERINFO.name,Gson().toJsonTree(userInfo))
+        }
+        ServerData.adminSocket?.send(jsonObject.toString())
     }
 
     /**
@@ -118,7 +140,7 @@ object ServerToAdmin {
      */
     suspend fun sendMessage(chatMessage: ChatMessage){
         val jsonObject = JsonObject().apply {
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
             addProperty(Types.TYPE.name, Messages.APPENDMESSAGE.name)
         }
         val jsonChat = Gson().toJson(chatMessage)
@@ -132,7 +154,7 @@ object ServerToAdmin {
      */
     suspend fun sendNewMessageReceived(socketId: String){
         val jsonObject = JsonObject().apply {
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
             addProperty(Types.TYPE.name, Messages.NEWMESSAGE.name)
             addProperty(Messages.NEWMESSAGE.name,socketId)
         }
@@ -144,7 +166,7 @@ object ServerToAdmin {
      */
     suspend fun userConnected(){
         val jsonObject = JsonObject().apply {
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
             addProperty(Types.TYPE.name, ServerStatus.ADDCONNECTEDUSER.name)
         }
         ServerData.adminSocket?.send(jsonObject.toString())
@@ -155,7 +177,7 @@ object ServerToAdmin {
      */
     suspend fun userDisconnected(){
         val jsonObject = JsonObject().apply {
-            addProperty(Types.VIEW.name, AdminStatus.CHATSCREEN.name)
+            addProperty(Types.VIEW.name, AdminScreen.CHATSCREEN.name)
             addProperty(Types.TYPE.name, ServerStatus.REMOVECONNECTEDUSER.name)
         }
         ServerData.adminSocket?.send(jsonObject.toString())

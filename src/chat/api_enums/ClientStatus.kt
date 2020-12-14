@@ -8,6 +8,7 @@ enum class ClientStatus {
     SETCOOKIE,
     GETCOOKIE,
     SOCKETID,
-    INVALIDCOOKIE
+    INVALIDCOOKIE,
+    RENAMEUSER
 
 }

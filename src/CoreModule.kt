@@ -1,17 +1,11 @@
 
-import chat.api_enums.ClientStatus
-import chat.api_enums.Types
-import chat.daos.ChatMessagesDAO
-import chat.daos.ChatUserDatabaseDAO
+import chat.daos.ChatUserDAO
 import chat.daos.DatabaseConnectionDAO
-import chat.dataclass.ChatMessage
-import chat.exceptions.NoAdminCredentials
 import chat.servercommunication.*
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import io.ktor.application.*
-import io.ktor.locations.*
 import io.ktor.features.*
 import io.ktor.http.cio.websocket.*
 import java.time.*
@@ -19,22 +13,12 @@ import io.ktor.auth.*
 import io.ktor.gson.GsonConverter
 import io.ktor.gson.gson
 import io.ktor.http.ContentType
-import io.ktor.request.receive
-import io.ktor.request.receiveParameters
-import io.ktor.response.respond
-import io.ktor.routing.get
-import io.ktor.routing.post
 import io.ktor.routing.routing
 import io.ktor.util.*
-
-import io.ktor.utils.io.readFully
 import io.ktor.websocket.*
-import org.intellij.lang.annotations.Language
 import org.slf4j.LoggerFactory
-import java.nio.charset.Charset
-import java.security.MessageDigest
 import java.text.DateFormat
-import java.util.*
+
 
 
 /**
@@ -48,6 +32,7 @@ fun main(args: Array<String>) : Unit =  io.ktor.server.netty.EngineMain.main(arg
 @kotlin.jvm.JvmOverloads
 fun Application.coremodule(testing: Boolean = false) {
 
+    val gson = Gson()
     val logger = LoggerFactory.getLogger("infologger")
 
     /**
@@ -60,7 +45,7 @@ fun Application.coremodule(testing: Boolean = false) {
         gson {
             setDateFormat(DateFormat.LONG)
             setPrettyPrinting()
-            register(ContentType.Text.Plain, GsonConverter(GsonBuilder().apply {}.create()))
+            register(ContentType.Text.Plain, GsonConverter(GsonBuilder().create()))
         }
     }
 
@@ -73,14 +58,11 @@ fun Application.coremodule(testing: Boolean = false) {
         install(XForwardedHeaderSupport) // WARNING: for security, do not include this if not behind a reverse proxy
     }
 
-
-
-
     /**
      * Installing Websockets and defining their behaviour
      * @see https://ktor.io/servers/features/websockets.html for explanation
      */
-    install(io.ktor.websocket.WebSockets) {
+    install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
         maxFrameSize = Long.MAX_VALUE
@@ -103,47 +85,21 @@ fun Application.coremodule(testing: Boolean = false) {
             }
     }
 
+
     routing {
-
         /**
-         * Connection as Admin to the server needs an authentication
-         */
-        authenticate("admin") {
-            webSocket("/") {
-
-                logger.info("User connected;Admin")
-                val gson = Gson()
-                ServerData.setHostSocket(this)
-                try {
-                    ServerToAdmin.getOnlineChatUser()
-                    while (true) {
-                        val frame = incoming.receive()
-                        if (frame is Frame.Text) {
-                            val json = gson.fromJson(frame.readText(), JsonObject::class.java)
-                            AdminToServer.handleMessage(json)
-                        }
-                        else throw Exception()
-                    }
-                }catch (e: Exception){
-                    logger.info("User disconnected;Admin")
-                    ServerData.setOffline()
-                    ServerData.adminSocket = null
-                }
-            }
-        }
-
-        /**
-         * Basic connection for visitors of the website
-         */
-        webSocket("/myws/echo") {
-
+     * Basic connection for visitors of the website
+     */
+        webSocket("/websocket") {
             try {
-                val gson = Gson()
+                ServerData.userConnected(call.attributes[ServerData.cookieAttribute],this)
                 ServerToUser.sendHostStatus(this)
-                ServerToUser.requestSocketID(this)
+                if (ServerToUser.sendChatLog(call.attributes[ServerData.cookieAttribute],this)){
+                    ServerData.addActiveChatUser(call.attributes[ServerData.cookieAttribute])
+                }
 
                 while (true) {
-                    this.closeReason
+
                     val frame = incoming.receive()
                     if (frame is Frame.Text) {
                         log.info(frame.readText())
@@ -160,7 +116,60 @@ fun Application.coremodule(testing: Boolean = false) {
                 ServerData.userDisconnected(this)
             }
         }
+
+    }.intercept(ApplicationCallPipeline.Monitoring){
+        val cookies = call.request.cookies.rawCookies
+        if (cookies.containsKey("ChatID")){
+            var userID = call.request.cookies.rawCookies.getValue("ChatID")
+            if (!UserIDHandling.checkValidUserID(cookies.getValue("ChatID"))){
+                val userCookie = UserIDHandling.createNewUser()
+                call.response.cookies.append(userCookie)
+                userID = userCookie.value
+
+            }
+            UserIDHandling.setUserID(call,userID)
+        }
+        else{
+            val newID = UserIDHandling.createNewUser()
+            call.response.cookies.append(newID)
+        }
+
     }
+
+
+
+    routing {
+        /**
+         * Connection as Admin to the server needs an authentication
+         */
+        authenticate("admin") {
+            webSocket("/websocketAdmin") {
+
+                logger.info("User connected;Admin")
+                ServerData.setHostSocket(this)
+                try {
+                    ServerToAdmin.getOnlineChatUser()
+                    while (true) {
+                        val frame = incoming.receive()
+                        if (frame is Frame.Text) {
+                            val json = gson.fromJson(frame.readText(), JsonObject::class.java)
+                            logger.info("Admin sent;${json.toString()}")
+                            AdminToServer.handleMessage(json)
+                        }
+                        else throw Exception()
+                    }
+                }catch (e: Exception){
+                    logger.error("User disconnected;Admin ${e.message}")
+                    ServerData.setOffline()
+                    ServerData.adminSocket = null
+                }
+            }
+        }
+
+
+    }
+
+
 
 
 
@@ -170,10 +179,11 @@ fun Application.coremodule(testing: Boolean = false) {
  * Setup the whole server environment
  * @param environment the applicationenvironment with which the server is started
  */
+@KtorExperimentalAPI
 private fun setupEnvironment(environment: ApplicationEnvironment){
     DatabaseConnectionDAO.setupDatabase(environment)
     ServerData.setupServer(environment)
-    ChatUserDatabaseDAO.setupSocketIDSalt(environment)
+    ChatUserDAO.setupSocketIDSalt(environment)
 }
 
 

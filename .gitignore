@@ -5,6 +5,7 @@
 /build/classes
 /build/resources
 /build/tmp
+/serverlogs
 *.iml
 *.ipr
 *.iws

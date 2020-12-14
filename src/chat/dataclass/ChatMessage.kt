@@ -8,10 +8,10 @@ class ChatMessage(
     var nachricht : String = ""
 ){
   companion object{
-      val nachrichtenID_column = "nachrichtenID"
-      val gesendet_um_column = "gesendet_um"
-      val user_gesendet_column = "user_gesendet"
-      val nachricht_column = "nachricht"
+      const val nachrichtenID_column = "nachrichtenID"
+      const val gesendet_um_column = "gesendet_um"
+      const val user_gesendet_column = "user_gesendet"
+      const val nachricht_column = "nachricht"
 
 
   }

@@ -1,15 +1,12 @@
 package chat.daos
 
-import chat.exceptions.NoAdminCredentials
+
 import chat.exceptions.NoDataBaseException
-import chat.servercommunication.ServerData
 import io.ktor.application.ApplicationEnvironment
 import io.ktor.util.KtorExperimentalAPI
-import org.intellij.lang.annotations.Language
 import org.slf4j.LoggerFactory
-import java.sql.Connection
-import java.sql.DriverManager
-import kotlin.math.log
+import java.sql.*
+
 
 
 object DatabaseConnectionDAO {
@@ -26,6 +23,7 @@ object DatabaseConnectionDAO {
      * @param environment the Applicationenvironment, which contains the parameters for the server startup
      */
 
+    @KtorExperimentalAPI
     fun setupDatabase(environment : ApplicationEnvironment){
 
         /**
@@ -83,29 +81,35 @@ object DatabaseConnectionDAO {
      * Create tables in the database for this server
      */
     private fun setupColumns(){
-        val con = this.getConnection()
-        var statement = con.createStatement()
+
+
         val createChatNachrichten = "create table if not exists chatnachrichten"+
         "( nachrichtenID int auto_increment, " +
                 "gesendet_um text null, " +
                 "user_gesendet tinyint(1) null, " +
                 "nachricht text null, " +
                 "primary key (nachrichtenID)); "
+        executeStatement(createChatNachrichten)
 
         val createChatUser = "    create table if not exists chatuser" +
-                "        ( SocketID varchar(88) not null," +
+                "        ( socketID varchar(88) not null," +
+                "        name text null,   " +
                 "        lastlogin text null," +
-                "        lastmessage text null," +
                 "        messageIDs json null," +
+                "        infoIDs json null,"       +
                 "        creationtime timestamp default CURRENT_TIMESTAMP null," +
-                "        primary key (SocketID));"
+                "        primary key (socketID));"
 
-        statement.execute(createChatNachrichten)
-        statement.close()
-        statement = con.createStatement()
-        statement.execute(createChatUser)
-        statement.close()
-        con.close()
+        executeStatement(createChatUser)
+
+        val createUserInfo = "create table if not exists userinfos" +
+                " (userinfoID int auto_increment," +
+                " userinfo text null," +
+                " creationtime timestamp default CURRENT_TIMESTAMP null," +
+                " primary key (userinfoID));"
+
+        executeStatement(createUserInfo)
+
     }
 
     /**
@@ -119,12 +123,76 @@ object DatabaseConnectionDAO {
         throw NoDataBaseException(errorMessage)
     }
 
+    /**
+     * Open a connection,create a statement and execute the given query
+     * When data need to be retrieved the resultset can be accessed if this query creates one
+     * requesting the generated autokeys with the parameter auotkeys returns the autokey as Int
+     * @param query The query which shall be executed
+     * @param autokeys do you want to retrieve the generated autokeys from this query?
+     * @param resultSet If operation with the resultset need to be done, this can be done in this lambda function
+     */
+    fun executeStatement(query : String, autokeys : Boolean = false, resultSet: (ResultSet) -> Any? = {}): Any?{
+        var returnValue : Any? = null
+        DriverManager.getConnection(url, user, pass).use { connection ->
+
+            connection.createStatement().use { statement ->
+
+                if (autokeys) statement.execute(query,Statement.RETURN_GENERATED_KEYS)
+                else statement.execute(query)
+                returnValue = getReturnValue(autokeys,statement,resultSet)
+            }
+        }
+
+        return  returnValue
+    }
+
 
     /**
-     * get a connection to the database
-     * @return A connection to a database with the arguments submitted at startup
+     * This creates a preparedStatement from the given query and uses the values given as values for the placeholders
+     * @see executeStatement for more information
+     * @param values Given values for the placeholders of the statement.
+     * The class of the values will be identified and submitted to the
+     * prepared statement according to their class
      */
-    fun getConnection() : Connection {
-        return DriverManager.getConnection(url, user, pass)
+    fun executePreparedStatement(query: String, values : ArrayList<Any>, autokeys : Boolean = false,
+                                 resultSet: (ResultSet) -> Any? = {}) : Any? {
+        var returnValue : Any? = null
+        DriverManager.getConnection(url, user, pass).use { connection ->
+
+            val statement = if (autokeys) connection.prepareStatement(query, PreparedStatement.RETURN_GENERATED_KEYS)
+            else connection.prepareStatement(query)
+
+            statement.use { preparedStatement ->
+
+                for (i in 0 until values.size) {
+                    when (values[i]::class.simpleName) {
+                        "String" -> preparedStatement.setString(i + 1, values[i] as String)
+                        "Int" -> preparedStatement.setInt(i + 1, values[i] as Int)
+                        "Boolean" -> preparedStatement.setBoolean(i + 1, values[i] as Boolean)
+                    }
+                }
+                preparedStatement.execute()
+                returnValue = getReturnValue(autokeys, preparedStatement, resultSet)
+            }
+        }
+
+        return returnValue
+    }
+
+    /**
+     * Helperfunction for executeStatement functions which returns the generated keys, when they are requested
+     * otherwise calls the submitted lambda function for the resultset
+     * @see executeStatement
+     * @see executePreparedStatement
+     */
+    private fun getReturnValue(autokeys: Boolean,statement: Statement,resultSet: (ResultSet) -> Any?) : Any? {
+
+        return if (autokeys) {
+            with(statement.generatedKeys) {
+                if (!next()) return@with null
+                getInt(1)
+            }
+        }
+        else resultSet(statement.resultSet?:return null)
     }
 }
