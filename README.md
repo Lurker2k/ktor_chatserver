@@ -34,9 +34,9 @@ and can rename the user to recognize him when he returns, to receive the name in
 
 ## Client API
 
-When connecting as a client to the server the data sent is expected to be in the JSON format.
+When connecting as a client to the server the data sent is expected to be in the **JSON** format.
 
-Every message has a key called **TYPE** which includes all other values.
+Every message has a key called **TYPE** which defines what type is sent.
 
 The types are:
 
@@ -61,10 +61,114 @@ class ChatMessage(
 )
 ```
 
+**The classes are converted to JSON with the library GSON and the function toJsonTree**
+
 MESSAGE is used, when the server sends a message to the client or when the client sends a message to the server.
 When the Type is MESSAGE, the JSON contains a Key called **MESSAGE** which contains a String with the sent message.
 
 ## Admin API
+
+The admin API is defined by data in the JSON format. 
+
+the admin API can be split in data sent to the admin by the server and data sent to the server by the admin.
+
+### Admin to server
+
+Every message from the admin contains a key named **TYPE** which defines how the server handles the rest of the data sent. The types which can be sent are
+
+* ONLINE
+* OFFLINE
+* SOCKETID
+* RENAMEUSER
+* ADDUSERINFO
+* REMOVEINFO
+* MESSAGE
+
+- ONLINE and OFFLINE are sent, when the admin enables or disables the chat. These messages set a value at the server and are forwarded to all connected clients
+through the client API
+
+- SOCKETID contains an additional key of **SOCKETID** with a value of the selected userID. This tells the server, that the admin wants to retrieve all infos and the chatlog of
+the user with this userID. The server will retrieve these data from the database and send them to the admin. 
+
+- RENAMEUSER an Object with this type contains two values. One value has the key **SOCKETID** which defines, for which user the name will be changed in the database.
+The other value has the key **RENAMEUSER** and contains the new name for the user.
+
+- ADDUSERINFO This type has two additional values. One value has the key **SOCKETID** which contains the userID and the other value has the key **ADDUSERINFO** which contains
+the info, which shall be added to the user as a String.
+
+- REMOVEINFO contains the keys **SOCKETID** and **REMOVEINFO**. REMOVEINFO contains a value of the type Int which is the id of the info added to the user in the database, which
+will be deleted.
+
+- MESSAGE contains the keys **SOCKETID** and **MESSAGE**. MESSAGE contains a String which will be sent to the user and added to the database.
+
+### Server to admin
+
+Messages sent to the admin from the server are sent in the JSON format. The messages are designed to work with the controlpanel designed for the connection to this server
+as admin and contain at least 2 values. One value has the key  **TYPE** which defines what shall be done with the data and another value has the key **VIEW** which
+tells the controlpanel at which screen this shall be handled. **VIEW** can have two values **CHATSCREEN** and **MAINSCREEN**. 
+
+The values of **TYPE** for **MAINSCREEN** are
+
+* ONLINE
+* OFFLINE
+
+ONLINE and OFFLINE are sent to the admin, when the admin has successfully enabled or disabled the chat.
+
+The values of **TYPE** for **CHATSCREEN** are
+
+* CHATUSERS
+* ADDCONNECTEDUSER
+* REMOVECONNECTEDUSER
+* ADDCHATUSER
+* REMOVECHATUSER
+* CHATLOG
+* ADDUSERINFO
+* GETUSERINFO
+* APPENDMESSAGE
+* NEWMESSAGE
+
+CHATUSERS sends the data of all currently connected users who are willing to chat and the amount of all users connected to the admin. 
+The data sent to the admin contain a key **CONNECTEDUSER** which holds the current amount of connected users as Int. Another key is
+**CHATUSERS** which contains a JSONARRAY of objects of the class ChatUser which is defined as followed:
+
+```
+data class ChatUser(
+    var socketID : String = "",
+    var loginTime : String = "",
+    var name : String? = null,
+    var neueNachrichten : Int = 0
+)
+```
+
+**The classes are converted to JSON with the library GSON and the function toJsonTree**
+
+ADDCONNECTEDUSER and REMOVECONNECTEDUSER have no additional values and are used to tell the admin, that either one user recently connected or disconnected from the server
+and the current usercount shall be increased or decreased by one.
+
+ADDCHATUSER contains a key **ADDCHATUSER** which contains an object of the class ChatUser
+
+REMOVECHATUSER contains a key **SOCKETID** which contains the userID of the user who disconnected from the server
+
+CHATLOG contains a key **CHATLOG** which has a JSONARRAY of Chatmessage classes as value
+
+ADDUSERINFO has a key **ADDUSERINFO** which contains an object of the class UserInfo which is defined as followed: 
+
+```
+data class UserInfo (
+val info : String,
+val infoID : Int
+)
+```
+
+**The classes are converted to JSON with the library GSON and the function toJsonTree**
+
+GETUSERINFO has a key **GETUSERINFO** which contains a JSONARRAY of UserInfo classes
+
+APPENDMESSAGE has a key **APPENDMESSAGE** which contains an object of the class ChatMessage
+
+NEWMESSAGE has no additional value and is sent when a user has sent a message to the admin. 
+
+
 
 ## Necessary parameter
 
